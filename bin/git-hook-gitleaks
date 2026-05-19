@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+ME=$(basename "$0")
+
+# To enable this hook, add the following configuration to your git config (e.g. in .git/config or ~/.gitconfig):
+# 
+# [hook "gitleaks"]
+# 	event = pre-commit
+# 	command = git-hook-gitleaks
+
+# This script is intended to be used as a git pre-commit hook to run gitleaks against staged changes.
+# It checks for the presence of staged changes and whether the hook is disabled via git config before running gitleaks.
+if git diff --cached --quiet; then
+	echo "No staged changes, skipping \"$ME\" hook."
+	exit 0
+fi
+
+# Check if the gitleaks pre-commit hook is disabled via git config
+# We check for "false" explicitly to allow for the possibility that the config value is unset (which should default to enabled)
+if [[ `git config --bool hook.gitleaks.enabled` == "false" ]]; then
+	echo "Warning: gitleaks precommit disabled (enable with \`git config hook.gitleaks.enabled true\`)"
+	exit 0
+fi
+
+# Check if gitleaks is installed and available in PATH
+if [ "$(command -v gitleaks)" ]; then
+	echo "Running gitleaks pre-commit hook..."
+else
+	echo "Warning: gitleaks is not installed or not found in PATH. Please install gitleaks to enable the pre-commit hook for scanning staged changes for secrets."
+	echo -e "\nYou can install gitleaks by running the following command:\n"
+	echo "On macOS: brew install gitleaks"
+	echo "On NixOS: nix-env -iA nixos.gitleaks"
+	echo "On Non NixOS: nix-env -iA nixpkgs.gitleaks (without flakes)"
+	echo "              nix profile add nixpkgs#gitleaks (with flakes)"
+	exit 1
+fi
+
+# Add --no-color when running in CI or non-interactive environments to avoid ANSI color codes in the output
+# Also check for GUI environments
+# - CI is commonly set in CI environments
+# - ForkProcessId is set by the Fork Git client, https://fork.dev/
+if [[ -n "${CI}" ]] || [[ -n "${ForkProcessId}" ]]; then
+	set -- --no-color "$@"
+fi
+
+if gitleaks protect -v --redact --staged "$@"; then
+	echo -e "\nNo secrets detected in staged changes.\n"
+	exit 0
+else
+	echo -e "\nWarning: gitleaks has detected sensitive information in your changes.\nTo disable the gitleaks precommit hook run the following command:\n\ngit config hooks.gitleaks false\n"
+	exit 1
+fi
