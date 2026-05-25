@@ -1,6 +1,6 @@
 ## About
 
-[@soramitsukhmer](https://github.com/soramitsukhmer) git tools
+[@soramitsukhmer](https://github.com/soramitsukhmer) git tools, see [soramitsukhmer/homebrew-tap](https://github.com/soramitsukhmer/homebrew-tap)
 
 ## Usage
 
